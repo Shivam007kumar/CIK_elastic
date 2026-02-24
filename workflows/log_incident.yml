@@ -1,0 +1,52 @@
+name: "Dreamer Log Incident"
+description: "Logs a security or operational incident to the knowledge graph. Creates a structured note with incident details linked to the affected namespace. Used by the Dreamer Agent during incident response workflows."
+tags:
+  - incident-response
+  - knowledge-management
+  - context-isolation
+
+triggers:
+  - type: manual
+
+inputs:
+  - name: title
+    type: string
+    required: true
+    description: "Short incident title"
+  - name: description
+    type: string
+    required: true
+    description: "Detailed incident description"
+  - name: severity
+    type: string
+    required: true
+    description: "Incident severity: 'critical', 'high', 'medium', 'low'"
+  - name: affected_project
+    type: string
+    required: true
+    description: "The namespace/project affected by this incident"
+
+steps:
+  - name: log_incident
+    type: elasticsearch.index
+    with:
+      index: "dreamer-memory"
+      document:
+        head: "{{ inputs.title }}"
+        relation: "INCIDENT"
+        tail: "{{ inputs.affected_project }}"
+        content: "[INCIDENT - {{ inputs.severity | upcase }}] {{ inputs.title }}: {{ inputs.description }}"
+        namespace: "{{ inputs.affected_project }}"
+        doc_type: "note"
+        status: "dreamed"
+        timestamp: "{{ 'now' | date: '%s' | times: 1000 }}"
+
+  - name: check_shared_impact
+    type: elasticsearch.esql.query
+    with:
+      format: json
+      query: |
+        FROM dreamer-memory
+        | WHERE tail == "{{ inputs.affected_project }}" AND relation == "SERVES" AND status == "dreamed"
+        | KEEP head, relation, tail, namespace
+        | LIMIT 5

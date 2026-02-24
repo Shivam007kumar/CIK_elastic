@@ -1,0 +1,45 @@
+name: "Dreamer Ingest Memory"
+description: "Ingests a new knowledge triplet or note into the Elastic Dreamer knowledge graph with namespace isolation. Used by the Dreamer Agent to write new information during conversations."
+tags:
+  - knowledge-management
+  - context-isolation
+
+triggers:
+  - type: manual
+
+inputs:
+  - name: head
+    type: string
+    required: true
+    description: "The subject entity (e.g., 'Alice Chen', 'Project_Alpha')"
+  - name: relation
+    type: string
+    required: true
+    description: "The relationship type (e.g., 'WORKS_ON', 'USES_DB', 'HAS_NOTE')"
+  - name: tail
+    type: string
+    required: true
+    description: "The object entity or note content"
+  - name: namespace
+    type: string
+    required: true
+    description: "The context isolation namespace (e.g., 'Project_Alpha')"
+  - name: doc_type
+    type: string
+    required: false
+    description: "Document type: 'triplet' or 'note' (default: 'triplet')"
+
+steps:
+  - name: write_to_index
+    type: elasticsearch.index
+    with:
+      index: "dreamer-memory"
+      document:
+        head: "{{ inputs.head }}"
+        relation: "{{ inputs.relation }}"
+        tail: "{{ inputs.tail }}"
+        content: "{{ inputs.head }} {{ inputs.relation }} {{ inputs.tail }}"
+        namespace: "{{ inputs.namespace }}"
+        doc_type: "{{ inputs.doc_type | default: 'triplet' }}"
+        status: "raw"
+        timestamp: "{{ 'now' | date: '%s' | times: 1000 }}"
