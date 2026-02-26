@@ -1,163 +1,172 @@
-# 🧠 Elastic Dreamer V2
+# 🧠 Elastic Dreamer
 
-**Elastic Dreamer** — A multi-step AI agent that enforces strict namespace isolation for enterprise knowledge graph retrieval, built with Elastic Agent Builder.
+> **A Secure Knowledge Graph Agent preventing cross-project data leakage via ES|QL Namespace Isolation.**
+> *Built for the Elasticsearch Agent Builder Hackathon (Jan–Feb 2026)*
 
-> Built for the [Elasticsearch Agent Builder Hackathon](https://elasticsearch.devpost.com/) (Jan–Feb 2026)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Elastic Stack](https://img.shields.io/badge/Elastic-Agent%20Builder-005571?logo=elastic&logoColor=white)](https://www.elastic.co/)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-success)](https://elastic-demo.shivam007.dev)
 
 ---
 
-## 🎯 Problem
+## 🚨 The Problem: The "Data Leakage" Nightmare
+In multi-project enterprises, standard RAG pipelines flatten data. If an engineer working on **Project Alpha** asks an AI: *"What is the database password?"*, a standard vector search might accidentally retrieve credentials from **Project Beta**.
 
-In multi-project enterprises, AI agents with shared memory create a critical security risk: **cross-project data leakage**. When an engineer asks "What's the database password?" while working on Project Alpha, the agent must NEVER return Project Beta's credentials.
+This **Cross-Project Data Leakage** makes generic AI agents unsafe for internal enterprise work.
 
-Traditional RAG systems lack this isolation. Knowledge graphs (like Neo4j) solve it but don't scale. Elastic Dreamer brings knowledge graph semantics to Elasticsearch's scale.
+## 🛡️ The Solution: Elastic Dreamer
+Elastic Dreamer encodes knowledge as **Graph Triplets** `(Head)-[Relation]->(Tail)` directly within Elasticsearch. It uses **Elastic Agent Builder** with **7 custom tools** to enforce strict **Namespace Isolation**.
 
-## 💡 Solution: Knowledge Graph in Elasticsearch
+The Agent **actively reasons** about which project context it is in and uses **ES|QL Parameterized Queries** to physically block access to unauthorized data.
 
-Elastic Dreamer stores knowledge as **graph triplets** `(head) -[relation]-> (tail)` within isolated namespaces:
+### 🔒 Architecture: The Namespace Wall
 
+```mermaid
+graph TD
+    subgraph "Project_Alpha (Namespace)"
+    A[Alice] --LEADS--> Alpha
+    Alpha --USES_DB--> RDS
+    RDS --PASSWORD--> P1[REDACTED]
+    end
+
+    subgraph "Project_Beta (Namespace)"
+    D[David] --LEADS--> Beta
+    Beta --USES_DB--> SQL
+    SQL --PASSWORD--> P2[REDACTED]
+    end
+
+    subgraph "Shared_Infra (Cross-Ref)"
+    J[Jenkins] --SERVES--> Alpha
+    J --SERVES--> Beta
+    end
 ```
+
+*(ASCII Version for plain text viewing)*
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │              ELASTIC DREAMER KNOWLEDGE GRAPH                 │
 ├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Project_Alpha (isolated)           Project_Beta (isolated) │
+│  Project_Alpha (Isolated)           Project_Beta (Isolated) │
 │  ┌────────────────────────┐        ┌────────────────────┐   │
 │  │ Alice ──LEADS──> Alpha │        │ David ──LEADS──> β │   │
 │  │ Alpha ──USES_DB──> RDS │        │ Beta ──USES_DB──>  │   │
 │  │ RDS ──PASSWORD──>      │        │   Cloud SQL        │   │
-│  │   "alpha_pg_2024!"     │        │ SQL ──PASSWORD──>   │   │
-│  │ Alpha ──HOSTED_ON──>   │        │   "beta_mysql_h1!" │   │
-│  │   AWS                  │        │ Beta ──HOSTED_ON──> │   │
-│  └────────────────────────┘        │   GCP              │   │
+│  │   "*****" (Redacted)   │        │ SQL ──PASSWORD──>   │   │
+│  └────────────────────────┘        │   "*****" (Redacted)│   │
 │              🔒                     └────────────────────┘   │
 │          NAMESPACE WALL              🔒                      │
 │         (Never crosses)           NAMESPACE WALL             │
-│                                                             │
-│  Shared_Infra (cross-cutting)     Global (company-wide)     │
-│  ┌────────────────────────┐       ┌─────────────────────┐   │
-│  │ Jenkins ──SERVES──>    │       │ VPN ──ENDPOINT──>   │   │
-│  │   Alpha AND Beta       │       │   vpn.example.com   │   │
-│  │ Grafana ──MONITORS──>  │       │ HR ──URL──>         │   │
-│  │   Alpha AND Beta       │       │   hr.example.com    │   │
-│  └────────────────────────┘       └─────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Architecture
+---
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                USER (Kibana Agent Chat)                        │
-│    "Who works on Alpha and what DB do they use?"              │
-└──────────────────────┬────────────────────────────────────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────────────────────┐
-│           ELASTIC DREAMER AGENT (Agent Builder)               │
-│  Multi-step reasoning with 5 tools:                          │
-│  1. find_entity_relations → discover team members             │
-│  2. search_by_namespace  → get architecture details           │
-│  3. search_semantic      → fuzzy conceptual queries           │
-│  4. cross_reference      → find shared resources              │
-│  5. list_namespaces      → overview of all contexts           │
-└──────────────────────┬────────────────────────────────────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────────────────────┐
-│              ELASTICSEARCH (dreamer-memory index)             │
-│  65+ docs: triplets (head/relation/tail) + notes              │
-│  Dense vectors (Gemini 3072-dim) for semantic search          │
-│  Namespace field enforces context isolation                   │
-└───────────────────────────────────────────────────────────────┘
-                       ▲
-                       │
-┌───────────────────────────────────────────────────────────────┐
-│              DREAMER (Background Processor)                    │
-│  dreamer.py: ingest → extract triplets → vectorize → index   │
-│  Write-time consolidation engine                              │
-└───────────────────────────────────────────────────────────────┘
-```
+## 🛠️ Tech Stack & Features
 
-## 🛠️ Agent Builder Tools (All 3 Tool Types)
+*   **Elasticsearch Serverless:** Stores 65+ documents as triplets with Gemini 3072-dim embeddings.
+*   **Elastic Agent Builder:** Orchestrates the AI with 7 specific tools.
+*   **Google Gemini:** Used for "Dreaming" (Vectorization) and semantic search.
+*   **Python (FastAPI):** Backend ingestion engine.
+*   **React (Vite):** Frontend portal for real-time data entry.
 
-| # | Tool | Type | Purpose |
-|---|---|---|---|
-| 1 | `search_by_namespace` | ES\|QL | Text search within a namespace. Namespace parameter enforces isolation |
-| 2 | `find_entity_relations` | ES\|QL | Graph traversal — find all connections for an entity |
-| 3 | `list_namespaces` | ES\|QL | Overview of available contexts and document counts |
-| 4 | `cross_reference` | ES\|QL | Find entities shared across namespaces |
-| 5 | `search_semantic` | Index Search | Vector similarity using Gemini embeddings |
-| 6 | `ingest_memory` | **Workflow** | Write new knowledge triplets — agent can LEARN |
-| 7 | `log_incident` | **Workflow** | Log incidents + check shared infrastructure impact |
+### 🧰 The 7 Agent Tools (The "Brain")
 
-## 🎬 Demo Scenarios
+This agent doesn't just "chat." It uses a tool-driven architecture to **automate messy internal work**:
 
-```
-User: "What namespaces are available?"
-Agent: → Uses list_namespaces → Shows 4 contexts with doc counts
+| Tool Name | Type | Purpose |
+| :--- | :--- | :--- |
+| `search_by_namespace` | **ES|QL** | **Security Core.** Searches text *only* within a specific namespace parameter. |
+| `find_entity_relations` | **ES|QL** | **Graph Traversal.** Finds all `Head` or `Tail` connections for an entity. |
+| `list_namespaces` | **ES|QL** | Analytics. lists available contexts and document counts. |
+| `cross_reference` | **ES|QL** | **Analytics.** Finds shared infrastructure (e.g., Jenkins) used by multiple projects. |
+| `search_semantic` | **Index** | **Vector Search.** Uses Gemini embeddings for fuzzy conceptual matching. |
+| `ingest_memory` | **Workflow** | **Write capability.** Allows the agent to learn new facts during conversation. |
+| `log_incident` | **Workflow** | **Action.** Logs structured incident reports back to the system of record. |
 
-User: "I'm working on Project_Alpha. Who's on the team?"
-Agent: → Uses find_entity_relations(Project_Alpha)
-     → Returns: Alice (Tech Lead), Bob (Backend), Carol (DevOps)
+---
 
-User: "What's the database password?"
-Agent: → Uses search_by_namespace(Project_Alpha)
-     → Returns: "alpha_pg_2024!secure" (NEVER returns Beta's password)
-
-User: "Switch to Project_Beta. Same question."
-Agent: → Uses search_by_namespace(Project_Beta)
-     → Returns: "beta_mysql_h1pp4!" (completely different!)
-
-User: "Are there any shared resources between Alpha and Beta?"
-Agent: → Uses cross_reference
-     → Returns: Jenkins, Grafana, SonarQube, Vault serve both
-```
-
-## 🚀 Setup
+## 🚀 Getting Started
 
 ### Prerequisites
-- [Elastic Cloud Serverless](https://cloud.elastic.co/registration?cta=agentbuilderhackathon) (free trial)
-- [Google AI Studio](https://aistudio.google.com/apikey) API key (Gemini embeddings)
-- Python 3.10+
+1.  **Elastic Cloud Serverless** project.
+2.  **Google AI Studio API Key** (for Gemini embeddings).
+3.  **Python 3.11+** installed.
 
-### 1. Clone & Install
+### 1. Installation
 ```bash
-git clone https://github.com/YOUR_USERNAME/elastic-dreamer.git
-cd elastic-dreamer
-python3 -m venv venv
-source venv/bin/activate
+git clone https://github.com/Shivam007kumar/CIK_elastic.git
+cd CIK_elastic
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
-### 2. Configure
-```bash
-cp .env.example .env
-# Edit .env with your Elastic Cloud ID, API Key, and Gemini API Key
+### 2. Configuration
+Create a `.env` file in the root:
+```ini
+ELASTIC_CLOUD_ID=your_cloud_id
+ELASTIC_API_KEY=your_api_key
+GEMINI_API_KEY=your_gemini_key
 ```
 
-### 3. Seed Knowledge Graph
+### 3. Seed the Knowledge Graph ("The Dream")
+Run the seeder to ingest the demo data (Alpha, Beta, Shared, Global) and vectorize it:
 ```bash
-python dreamer.py          # Creates index + seeds 65 docs + vectorizes
-python dreamer.py --reset  # Reset: deletes and re-seeds fresh data
+python dreamer.py
+# Use --reset to clear the index and start fresh
+# python dreamer.py --reset
 ```
 
 ### 4. Configure Agent Builder
+Run the config script to generate the instructions and tool definitions for Kibana:
 ```bash
-python agent_config.py     # Prints all tool configs + agent instructions
+python agent_config.py
 ```
-Then in Kibana:
-1. **Agents → Manage Tools** → Create 4 ES|QL tools + 1 Index Search tool
-2. **Agents → Create Agent** → Paste instructions, assign all 5 tools
-3. Test in the agent chat!
+*Copy the output into Kibana's Agent Builder to create your agent.*
 
-## 🔑 Features Used (All 3 Tool Types)
-- **Elastic Agent Builder** — Custom agent with multi-step reasoning instructions and 7 tools
-- **ES|QL Custom Tools (4)** — Parameterized queries with namespace guards + graph traversal
-- **Index Search Tool (1)** — Vector similarity using Gemini 3072-dim embeddings
-- **Elastic Workflows (2)** — `ingest_memory` for learning + `log_incident` for incident response
-- **Elasticsearch** — Knowledge graph encoded as 65 triplets with dense vectors
-- **Write-Time Consolidation** — Background processor vectorizes data asynchronously
+---
 
-## 📝 License
-[MIT](LICENSE)
+## 📂 Project Structure
+
+```text
+CIK_elastic/
+├── agent_config.py      # Generates Agent Instructions & Tool Definitions
+├── dreamer.py           # Seeder script & Background "Dreaming" process
+├── server.py            # MCP Server / API logic
+├── requirements.txt     # Python dependencies
+├── workflows/           # Elastic Workflows (YAML)
+│   ├── ingest_memory.yml
+│   └── log_incident.yml
+├── dreamer-portal/      # FastAPI Backend Source
+└── dreamer-frontend/    # React Frontend Source
+```
+
+---
+
+## 🎬 Usage Scenarios (What to ask the Agent)
+
+**1. The Isolation Test**
+> *"I am working on Project Alpha. What is the database password?"*
+> * **Result:** Returns Postgres credentials.
+>
+> *"Now switch to Project Beta. What is the password?"*
+> * **Result:** Returns MySQL credentials. (Zero leakage).
+
+**2. Graph Traversal**
+> *"Who leads Project Alpha and who do they report to?"*
+> * **Result:** Traverses `Alice` -> `LEADS` -> `Alpha` and `Alice` -> `REPORTS_TO` -> `VP`.
+
+**3. Action Workflow**
+> *"Log a high severity incident for Project Alpha regarding Redis failure."*
+> * **Result:** Trigger `log_incident` workflow and writes to the index.
+
+---
+
+## 🏆 Hackathon Strategic Tracks
+This project targets:
+*   **Automate messy internal work:** By structuring siloed knowledge into a clean graph.
+*   **Build tool-driven agents:** Using 7 specific tools instead of relying on prompt hallucinations.
+*   **Let agents take reliable action:** via the `ingest_memory` and `log_incident` workflows.
+
+## 📜 License
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.

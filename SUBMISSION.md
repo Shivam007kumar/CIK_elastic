@@ -1,47 +1,31 @@
-# Elastic Dreamer — Devpost Submission Description (~300 words)
+# Elastic Dreamer — Devpost Submission
 
-## Problem Solved
+## Project Name
+Elastic Dreamer
 
-In multi-project enterprises, AI assistants with shared memory create a critical security
-risk: cross-project data leakage. When an engineer working on Project Alpha asks
-"What's the database password?", a standard RAG pipeline might return Project Beta's
-credentials — a catastrophic security failure. Traditional knowledge graphs (like Neo4j)
-solve context isolation but don't scale. Flat vector stores scale but lack structure.
+## Elevator Pitch
+A secure Knowledge Graph agent preventing data leakage via ES|QL namespace isolation. Combines graph traversal, semantic search, and workflows for safe, enterprise-grade automation.
 
-## Solution: Elastic Dreamer — Knowledge Graph in Elasticsearch
+## Description (~400 words)
 
-Elastic Dreamer encodes enterprise knowledge as **graph triplets**
-`(head)-[relation]->(tail)` within Elasticsearch, with strict namespace isolation
-enforced through ES|QL parameterized queries. The architecture has three layers:
+### The Problem: Cross-Project Data Leakage
+In enterprise environments, standard RAG pipelines create a critical security risk: **Data Flattening**. If an engineer working on *Project Alpha* asks an AI assistant "What's the database password?", a standard vector search often retrieves credentials from *Project Beta*. This cross-project leakage makes generic AI agents unsafe for internal work. Traditional knowledge graphs (like Neo4j) solve this but are complex to scale; flat vector stores scale but lack structure.
 
-**Write-Time Consolidation:** Raw data is ingested instantly with a namespace tag, then a
-background "Dreamer" agent vectorizes it using Gemini embeddings — separating fast writes
-from slow AI processing.
+### The Solution: Knowledge Graph in Elasticsearch
+Elastic Dreamer encodes enterprise knowledge as **graph triplets** `(head)-[relation]->(tail)` directly within Elasticsearch, enforcing strict namespace isolation through **ES|QL parameterized queries**. The architecture allows the agent to reason across project boundaries only when explicitly authorized.
 
-**Knowledge Graph Schema:** Instead of flat documents, data is structured as typed
-relationships (LEADS, USES_DB, PASSWORD, HOSTED_ON) across entities (people, services,
-projects). This enables graph-like traversal queries using ES|QL.
+**Key Innovations:**
+1.  **Namespace-Isolated Retrieval:** The agent uses ES|QL to lock queries to a specific namespace (e.g., `WHERE namespace == ?`). This acts as a security firewall—Project Alpha’s secrets are physically unreachable from Project Beta’s context.
+2.  **Tool-Driven Reasoning:** Instead of relying on prompts, the agent actively selects tools. It uses `find_entity_relations` to traverse team structures and `search_by_namespace` for precise data retrieval.
+3.  **Reliable Action (Workflows):** The agent isn't just read-only. It uses the `ingest_memory` workflow to learn new facts in real-time and the `log_incident` workflow to write structured incident reports back to the system.
 
-**Namespace-Isolated Retrieval:** Five Agent Builder tools (4 ES|QL + 1 Index Search)
-provide multi-step reasoning. The agent traverses entity relationships, performs semantic
-vector search, cross-references shared infrastructure — all while enforcing strict
-namespace boundaries. Project Alpha's credentials are physically unreachable from Project
-Beta's context.
+### Features Used
+*   **Elastic Agent Builder:** Orchestrating a custom agent with 7 distinct tools.
+*   **ES|QL Custom Tools (4):** For graph traversal, namespace isolation, and cross-reference analytics.
+*   **Elastic Workflows (2):** `ingest_memory` (write-back) and `log_incident` (operational automation).
+*   **Index Search Tool (1):** Semantic vector search using Gemini 3072-dim embeddings.
+*   **Elasticsearch Serverless:** Storing 65+ triplet documents with dense vectors.
 
-## Features Used
-
-- **Elastic Agent Builder:** Custom agent with multi-step reasoning instructions and 5 tools
-- **ES|QL Custom Tools (4):** Parameterized namespace guards, entity relationship traversal,
-  cross-namespace reference detection, and namespace listing
-- **Index Search Tool (1):** Semantic vector search using Gemini 3072-dim embeddings on the
-  knowledge graph
-- **Elasticsearch:** Triplet-based knowledge graph schema with dense vectors
-
-## What I Liked / Challenges
-
-1. **ES|QL guarded parameters** are perfect for security — the query structure is locked down
-   while the LLM fills in entity names. This maps beautifully to graph traversal queries.
-2. **Multi-tool agent reasoning** impressed me — the agent consistently chains
-   find_entity_relations → search_by_namespace for complex questions.
-3. **Challenge:** Encoding graph relationships as flat Elasticsearch documents required
-   careful schema design — a pattern worth documenting for the community.
+### Challenges & Highlights
+*   **Highlight:** The **ES|QL guarded parameters** are a perfect security fit for LLMs. By hardcoding the query structure (`FROM index | WHERE...`), we prevent prompt injection attacks while allowing flexible entity search.
+*   **Challenge:** Balancing real-time ingestion with vectorization latency. I solved this with a "Dreaming" pattern: data is ingested instantly as "raw" (fast write), then a background process vectorizes it to "dreamed" (slow AI) status asynchronously.
